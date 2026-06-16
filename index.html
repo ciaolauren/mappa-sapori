@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Italian DOP, IGP &amp; STG Tasting Map — Lauren Gill Translates</title>
+<title>Italian DOP, IGP &amp; STG Tasting Map — by Lauren Gill</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 <style>
   :root {
@@ -44,6 +44,12 @@
     color: #6b5d4f;
     font-style: italic;
     margin-bottom: 6px;
+  }
+  #sidebar .howto-note {
+    font-size: 0.76rem;
+    color: #6b5d4f;
+    line-height: 1.4;
+    margin-bottom: 2px;
   }
   .stat-row {
     display: flex;
@@ -158,6 +164,11 @@
   }
   .popup-save-btn:hover { background: var(--terracotta-dark); }
   .popup-save-status { font-size: 0.72rem; color: #6b5d4f; margin-top: 4px; font-family: Arial, sans-serif; }
+  .popup-divider { border: none; border-top: 1px solid #e2d8c2; margin: 10px 0 8px 0; }
+  .popup-mini-heading {
+    font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--terracotta-dark); font-weight: bold; margin-bottom: 6px;
+  }
 
   @media (max-width: 760px) {
     #app { flex-direction: column; }
@@ -171,7 +182,8 @@
   <div id="sidebar">
     <div>
       <h1>Italian DOP, IGP &amp; STG Tasting Map</h1>
-      <div class="subtitle">316 protected products, one delicious itinerary &mdash; Lauren Gill Translates</div>
+      <div class="subtitle">316 protected products, one delicious itinerary &mdash; by Lauren Gill</div>
+      <div class="howto-note">You're seeing my own tasting progress as I eat my way round Italy. Want to track your own? Just use the filters and click any marker &mdash; your own ticks, ratings and notes will save right here on your device.</div>
       <div class="stat-row">
         <span class="stat-pill">Total: <b id="stat-total">316</b></span>
         <span class="stat-pill">Tasted: <b id="stat-tasted">0</b></span>
@@ -258,6 +270,27 @@ function setEntry(num, entry) {
   tastingState[num] = entry;
 }
 
+// Visitors can keep their own personal tasting tracker, completely separate from
+// Lauren's shared progress above — it lives only in their own browser's localStorage.
+const VISITOR_STORAGE_KEY = 'mappaSaporiVisitorTastingTracker_v1';
+
+function loadVisitorState() {
+  try { return JSON.parse(localStorage.getItem(VISITOR_STORAGE_KEY)) || {}; }
+  catch (e) { return {}; }
+}
+function saveVisitorState(state) {
+  localStorage.setItem(VISITOR_STORAGE_KEY, JSON.stringify(state));
+}
+let visitorState = loadVisitorState();
+
+function getVisitorEntry(num) {
+  return visitorState[num] || { tasted: false, date: '', rating: '', notes: '' };
+}
+function setVisitorEntry(num, entry) {
+  visitorState[num] = entry;
+  saveVisitorState(visitorState);
+}
+
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -338,17 +371,40 @@ function popupHtml(p) {
   `;
 
   if (!isAdminMode()) {
-    // Public, read-only view of Lauren's tasting progress.
-    if (!e.tasted) {
-      return meta + `<div class="tasted-status no">Not tasted yet</div>`;
-    }
-    const stars = e.rating ? `<div class="popup-field"><label>Rating</label><span class="popup-stars">${'★'.repeat(Number(e.rating))}${'☆'.repeat(5 - Number(e.rating))}</span></div>` : '';
-    const notes = e.notes ? `<div class="popup-field"><label>Notes</label><div class="popup-notes-readonly">${escapeHtml(e.notes)}</div></div>` : '';
-    return meta + `
-      <div class="tasted-status yes">&#10003; Tasted${e.date ? ' on ' + escapeHtml(e.date) : ''}</div>
-      ${stars}
-      ${notes}
+    // Public, read-only view of Lauren's tasting progress, plus an editable
+    // section visitors can use to track their own tasting on this device.
+    const ve = getVisitorEntry(p.n);
+    const laurenBlock = e.tasted ? `
+      <div class="tasted-status yes">&#10003; Lauren's tasted${e.date ? ' on ' + escapeHtml(e.date) : ''}</div>
+      ${e.rating ? `<div class="popup-field"><label>Lauren's rating</label><span class="popup-stars">${'★'.repeat(Number(e.rating))}${'☆'.repeat(5 - Number(e.rating))}</span></div>` : ''}
+      ${e.notes ? `<div class="popup-field"><label>Lauren's notes</label><div class="popup-notes-readonly">${escapeHtml(e.notes)}</div></div>` : ''}
+    ` : `<div class="tasted-status no">Lauren hasn't tasted this yet</div>`;
+
+    const visitorBlock = `
+      <hr class="popup-divider">
+      <div class="popup-mini-heading">Track your own tasting</div>
+      <div class="tasted-toggle">
+        <input type="checkbox" id="visitor-tasted-${p.n}" ${ve.tasted ? 'checked' : ''}>
+        <label for="visitor-tasted-${p.n}">I've tasted this</label>
+      </div>
+      <div class="popup-field">
+        <label>Date tasted</label>
+        <input type="text" id="visitor-date-${p.n}" placeholder="e.g. 2026-09-12" value="${escapeHtml(ve.date || '')}">
+      </div>
+      <div class="popup-field">
+        <label>Rating</label>
+        <select id="visitor-rating-${p.n}">
+          <option value="">-</option>
+          ${[1,2,3,4,5].map(n => `<option value="${n}" ${String(ve.rating)===String(n)?'selected':''}>${n}</option>`).join('')}
+        </select>
+      </div>
+      <div class="popup-field">
+        <label>Notes</label>
+        <textarea id="visitor-notes-${p.n}" placeholder="Where, with whom, what it tasted like...">${escapeHtml(ve.notes || '')}</textarea>
+      </div>
     `;
+
+    return meta + laurenBlock + visitorBlock;
   }
 
   // Admin edit view.
@@ -378,21 +434,42 @@ function popupHtml(p) {
 }
 
 function wirePopup(p) {
-  if (!isAdminMode()) return;
-  const saveBtn = document.getElementById(`save-${p.n}`);
-  if (!saveBtn) return;
-  saveBtn.addEventListener('click', () => {
-    const tastedEl = document.getElementById(`tasted-${p.n}`);
-    const dateEl = document.getElementById(`date-${p.n}`);
-    const ratingEl = document.getElementById(`rating-${p.n}`);
-    const notesEl = document.getElementById(`notes-${p.n}`);
-    saveEntryRemote(p, {
-      tasted: tastedEl.checked,
-      date: dateEl.value,
-      rating: ratingEl.value,
-      notes: notesEl.value
+  if (isAdminMode()) {
+    const saveBtn = document.getElementById(`save-${p.n}`);
+    if (!saveBtn) return;
+    saveBtn.addEventListener('click', () => {
+      const tastedEl = document.getElementById(`tasted-${p.n}`);
+      const dateEl = document.getElementById(`date-${p.n}`);
+      const ratingEl = document.getElementById(`rating-${p.n}`);
+      const notesEl = document.getElementById(`notes-${p.n}`);
+      saveEntryRemote(p, {
+        tasted: tastedEl.checked,
+        date: dateEl.value,
+        rating: ratingEl.value,
+        notes: notesEl.value
+      });
     });
-  });
+    return;
+  }
+
+  // Public visitor mode — wire up the personal tracker fields (saved locally only).
+  const vTastedEl = document.getElementById(`visitor-tasted-${p.n}`);
+  if (!vTastedEl) return;
+  const vDateEl = document.getElementById(`visitor-date-${p.n}`);
+  const vRatingEl = document.getElementById(`visitor-rating-${p.n}`);
+  const vNotesEl = document.getElementById(`visitor-notes-${p.n}`);
+  function saveVisitor() {
+    setVisitorEntry(p.n, {
+      tasted: vTastedEl.checked,
+      date: vDateEl.value,
+      rating: vRatingEl.value,
+      notes: vNotesEl.value
+    });
+  }
+  vTastedEl.addEventListener('change', saveVisitor);
+  vDateEl.addEventListener('change', saveVisitor);
+  vRatingEl.addEventListener('change', saveVisitor);
+  vNotesEl.addEventListener('change', saveVisitor);
 }
 
 function markerStyleFor(p) {
@@ -518,7 +595,7 @@ document.getElementById('reset-btn').addEventListener('click', () => {
 });
 
 document.getElementById('export-btn').addEventListener('click', () => {
-  const data = PRODUCTS.map(p => ({ name: p.name, designation: p.d, ...getEntry(p.n) }))
+  const data = PRODUCTS.map(p => ({ name: p.name, designation: p.d, ...getVisitorEntry(p.n) }))
     .filter(p => p.tasted || p.notes || p.rating);
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
