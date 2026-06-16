@@ -1,1 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Italian DOP, IGP &amp; STG Tasting Map — Lauren Gill Translates</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+<style>
+  :root {
+    --terracotta: #b5532c;
+    --terracotta-dark: #8f3f20;
+    --cream: #faf6ee;
+    --cream-dark: #f0e8d8;
+    --olive: #6b7a45;
+    --ink: #2e2620;
+    --gold: #c9a24b;
+    --dop: #4a7c4e;
+    --igp: #c9a24b;
+    --stg: #5b7fa6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: 'Georgia', 'Iowan Old Style', serif; background: var(--cream); color: var(--ink); }
+  #app { display: flex; height: 100vh; }
 
+  #sidebar {
+    width: 340px;
+    min-width: 300px;
+    background: var(--cream-dark);
+    border-right: 2px solid var(--terracotta);
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  #sidebar h1 {
+    font-size: 1.3rem;
+    color: var(--terracotta-dark);
+    margin: 0 0 2px 0;
+    line-height: 1.25;
+  }
+  #sidebar .subtitle {
+    font-size: 0.82rem;
+    color: #6b5d4f;
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+  .stat-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .stat-pill {
+    background: white;
+    border: 1px solid var(--gold);
+    border-radius: 14px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    color: var(--ink);
+  }
+  .stat-pill b { color: var(--terracotta-dark); }
+
+  fieldset {
+    border: 1px solid #d8cdb8;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0;
+  }
+  legend {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--terracotta-dark);
+    padding: 0 4px;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+  }
+  select, input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #c9bda3;
+    border-radius: 6px;
+    background: white;
+    font-family: Arial, sans-serif;
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+  .checks { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; font-family: Arial, sans-serif; font-size: 0.85rem; }
+  .checks label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .swatch.dop { background: var(--dop); }
+  .swatch.igp { background: var(--igp); }
+  .swatch.stg { background: var(--stg); }
+
+  #reset-btn, #export-btn, #admin-toggle-btn {
+    font-family: Arial, sans-serif;
+    font-size: 0.8rem;
+    background: var(--terracotta);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+  }
+  #reset-btn:hover, #export-btn:hover, #admin-toggle-btn:hover { background: var(--terracotta-dark); }
+  #admin-toggle-btn { background: var(--olive); }
+  #admin-toggle-btn:hover { background: #545f37; }
+  #sync-status {
+    font-family: Arial, sans-serif;
+    font-size: 0.72rem;
+    color: #6b5d4f;
+    font-style: italic;
+  }
+
+  #list-section { flex: 1; }
+  #result-count { font-family: Arial, sans-serif; font-size: 0.78rem; color: #6b5d4f; margin-bottom: 6px; }
+  #product-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .list-item {
+    font-family: Arial, sans-serif;
+    font-size: 0.8rem;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .list-item:hover { background: #fff3e0; border-color: var(--gold); }
+  .list-item.tasted { opacity: 0.55; }
+  .list-item .tag { font-size: 0.68rem; padding: 1px 5px; border-radius: 8px; color: white; white-space: nowrap; }
+  .tag.dop { background: var(--dop); }
+  .tag.igp { background: var(--igp); color: #3a2f0c; }
+  .tag.stg { background: var(--stg); }
+
+  #map { flex: 1; }
+
+  .leaflet-popup-content-wrapper { border-radius: 10px; font-family: Arial, sans-serif; }
+  .popup-title { font-family: Georgia, serif; font-size: 1.05rem; color: var(--terracotta-dark); margin: 0 0 4px 0; }
+  .popup-meta { font-size: 0.78rem; color: #555; margin-bottom: 8px; }
+  .popup-badge { display: inline-block; padding: 1px 7px; border-radius: 8px; color: white; font-size: 0.7rem; margin-right: 4px; }
+  .popup-badge.dop { background: var(--dop); } .popup-badge.igp { background: var(--igp); color: #3a2f0c; } .popup-badge.stg { background: var(--stg); }
+  .popup-field { margin-bottom: 6px; font-size: 0.82rem; }
+  .popup-field label { display: block; font-weight: bold; margin-bottom: 2px; color: var(--ink); }
+  .popup-field input[type="text"], .popup-field textarea, .popup-field select {
+    width: 100%; padding: 4px 6px; border: 1px solid #c9bda3; border-radius: 4px; font-size: 0.8rem; font-family: Arial, sans-serif;
+  }
+  .popup-field textarea { resize: vertical; min-height: 40px; }
+  .tasted-toggle { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 0.85rem; font-weight: bold; }
+  .tasted-status { font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; }
+  .tasted-status.yes { color: var(--olive); }
+  .tasted-status.no { color: #888; font-style: italic; font-weight: normal; }
+  .popup-stars { color: var(--gold); letter-spacing: 1px; }
+  .popup-notes-readonly { font-size: 0.82rem; white-space: pre-wrap; }
+  .popup-save-btn {
+    font-family: Arial, sans-serif; font-size: 0.78rem; background: var(--terracotta); color: white;
+    border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; margin-top: 2px;
+  }
+  .popup-save-btn:hover { background: var(--terracotta-dark); }
+  .popup-save-status { font-size: 0.72rem; color: #6b5d4f; margin-top: 4px; font-family: Arial, sans-serif; }
+
+  @media (max-width: 760px) {
+    #app { flex-direction: column; }
+    #sidebar { width: 100%; height: 45%; border-right: none; border-bottom: 2px solid var(--terracotta); }
+    #map { height: 55%; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <div>
+      <h1>Italian DOP, IGP &amp; STG Tasting Map</h1>
+      <div class="subtitle">316 protected products, one delicious itinerary &mdash; Lauren Gill Translates</div>
+      <div class="stat-row">
+        <span class="stat-pill">Total: <b id="stat-total">316</b></span>
+        <span class="stat-pill">Tasted: <b id="stat-tasted">0</b></span>
+        <span class="stat-pill">Remaining: <b id="stat-remaining">316</b></span>
+      </div>
+      <div id="sync-status">Loading shared tasting progress&hellip;</div>
+    </div>
+
+    <fieldset>
+      <legend>Region</legend>
+      <select id="filter-region"><option value="">All regions</option></select>
+    </fieldset>
+
+    <fieldset>
+      <legend>Category</legend>
+      <select id="filter-category"><option value="">All categories</option></select>
+    </fieldset>
+
+    <fieldset>
+      <legend>Designation</legend>
+      <div class="checks">
+        <label><input type="checkbox" class="desig-check" value="DOP" checked> <span class="swatch dop"></span> DOP &mdash; Denominazione di Origine Protetta</label>
+        <label><input type="checkbox" class="desig-check" value="IGP" checked> <span class="swatch igp"></span> IGP &mdash; Indicazione Geografica Protetta</label>
+        <label><input type="checkbox" class="desig-check" value="STG" checked> <span class="swatch stg"></span> STG &mdash; Specialità Tradizionale Garantita</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Tasted status</legend>
+      <select id="filter-tasted">
+        <option value="">All</option>
+        <option value="yes">Tasted</option>
+        <option value="no">Not yet tasted</option>
+      </select>
+    </fieldset>
+
+    <fieldset>
+      <legend>Search by name</legend>
+      <input type="text" id="filter-search" placeholder="e.g. Parmigiano, Speck...">
+    </fieldset>
+
+    <button id="reset-btn">Reset filters</button>
+    <button id="export-btn">Export my tasting notes (.json)</button>
+    <button id="admin-toggle-btn">Admin login</button>
+
+    <div id="list-section">
+      <div id="result-count"></div>
+      <ul id="product-list"></ul>
+    </div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const PRODUCTS = [{"n":1,"name":"Abbacchio romano","d":"IGP","c":"Meat (fresh)","reg":"Lazio","prov":"Roma, Frosinone, Viterbo, Latina, Rieti","lat":41.9028,"lon":12.4964},{"n":2,"name":"Acciughe sotto sale del Mar Ligure","d":"IGP","c":"Fish & Seafood","reg":"Liguria","prov":"Genova, Imperia, Savona, La Spezia","lat":44.4056,"lon":8.9463},{"n":3,"name":"Aceto balsamico di Modena","d":"IGP","c":"Other (Annex I products)","reg":"Emilia-Romagna","prov":"Modena, Reggio Emilia","lat":44.6471,"lon":10.9252},{"n":4,"name":"Aceto balsamico tradizionale di Modena","d":"DOP","c":"Other (Annex I products)","reg":"Emilia-Romagna","prov":"Modena","lat":44.6471,"lon":10.9252},{"n":5,"name":"Aceto balsamico tradizionale di Reggio Emilia","d":"DOP","c":"Other (Annex I products)","reg":"Emilia-Romagna","prov":"Reggio Emilia","lat":44.6989,"lon":10.6307},{"n":6,"name":"Aglio bianco polesano","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Rovigo","lat":45.0707,"lon":11.7906},{"n":7,"name":"Aglio di Voghiera","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Ferrara","lat":44.8381,"lon":11.6198},{"n":8,"name":"Agnello del Centro Italia","d":"IGP","c":"Meat (fresh)","reg":"Abruzzo; Lazio; Marche; Toscana; Umbria; Emilia-Romagna","prov":"","lat":42.3506,"lon":13.7995},{"n":9,"name":"Agnello di Sardegna","d":"IGP","c":"Meat (fresh)","reg":"Sardegna","prov":"tutte","lat":40.1209,"lon":9.0129},{"n":10,"name":"Alto Crotonese","d":"DOP","c":"Oils & Fats","reg":"Calabria","prov":"Crotone","lat":39.0808,"lon":17.1269},{"n":12,"name":"Amarene brusche di Modena","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Modena, Bologna","lat":44.6471,"lon":10.9252},{"n":13,"name":"Anguria Reggiana","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Reggio Emilia","lat":44.6989,"lon":10.6307},{"n":14,"name":"Aprutino Pescarese","d":"DOP","c":"Oils & Fats","reg":"Abruzzo","prov":"Pescara","lat":42.4643,"lon":14.2142},{"n":15,"name":"Arancia del Gargano","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Foggia","lat":41.4621,"lon":15.5444},{"n":16,"name":"Arancia di Ribera","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Agrigento, Palermo","lat":37.3111,"lon":13.5765},{"n":17,"name":"Arancia rossa di Sicilia","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Catania, Siracusa, Enna","lat":37.5079,"lon":15.083},{"n":18,"name":"Asiago","d":"DOP","c":"Cheese","reg":"Trentino-Alto Adige; Veneto","prov":"Trento, Vicenza, Padova, Treviso","lat":45.8714,"lon":11.5108},{"n":19,"name":"Asparago bianco di Bassano","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Vicenza","lat":45.5455,"lon":11.5354},{"n":20,"name":"Asparago bianco di Cimadolmo","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Treviso","lat":45.6669,"lon":12.2433},{"n":21,"name":"Asparago di Badoere","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Padova, Treviso, Venezia","lat":45.4064,"lon":11.8768},{"n":22,"name":"Asparago di Cantello","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lombardia","prov":"Varese","lat":45.8206,"lon":8.825},{"n":23,"name":"Asparago verde di Altedo","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Bologna, Ferrara","lat":44.4949,"lon":11.3426},{"n":24,"name":"Basilico genovese","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Liguria","prov":"La Spezia, Genova, Imperia, Savona","lat":44.1023,"lon":9.824},{"n":25,"name":"Bergamotto di Reggio Calabria - Olio essenziale","d":"DOP","c":"Essential Oil","reg":"Calabria","prov":"Reggio Calabria","lat":38.1113,"lon":15.6619},{"n":26,"name":"Bitto","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Sondrio, Bergamo","lat":46.1709,"lon":9.8716},{"n":27,"name":"Bra","d":"DOP","c":"Cheese","reg":"Piemonte","prov":"Cuneo, Torino","lat":44.6986,"lon":7.8514},{"n":28,"name":"Bresaola della Valtellina","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Lombardia","prov":"Sondrio","lat":46.1709,"lon":9.8716},{"n":29,"name":"Brisighella","d":"DOP","c":"Oils & Fats","reg":"Emilia-Romagna","prov":"Ravenna, Forlì","lat":44.4173,"lon":12.201},{"n":30,"name":"Brovada","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Friuli Venezia Giulia","prov":"Trieste, Udine, Pordenone, Gorizia","lat":45.6495,"lon":13.7768},{"n":31,"name":"Bruzio","d":"DOP","c":"Oils & Fats","reg":"Calabria","prov":"Cosenza","lat":39.3088,"lon":16.2535},{"n":32,"name":"Burrata di Andria","d":"IGP","c":"Cheese","reg":"Puglia","prov":"Bari, Barletta-Andria-Trani, Brindisi, Foggia, Taranto, Lecce","lat":41.1171,"lon":16.8719},{"n":33,"name":"Caciocavallo silano","d":"DOP","c":"Cheese","reg":"Calabria; Campania; Molise; Puglia; Basilicata","prov":"Catanzaro, Cosenza, Avellino, Benevento, Caserta, Napoli, Salerno, Isernia, Campobasso, Foggia, Bari, Taranto, Brindisi, Matera, Potenza","lat":38.9097,"lon":16.5961},{"n":34,"name":"Canestrato di Moliterno","d":"IGP","c":"Cheese","reg":"Basilicata","prov":"Potenza e Matera","lat":40.6542,"lon":16.2051},{"n":35,"name":"Canestrato Pugliese","d":"DOP","c":"Cheese","reg":"Puglia","prov":"Foggia, Bari","lat":41.4621,"lon":15.5444},{"n":36,"name":"Canino","d":"DOP","c":"Oils & Fats","reg":"Lazio","prov":"Viterbo","lat":42.4207,"lon":12.1063},{"n":37,"name":"Cantuccini o Cantucci Toscani","d":"IGP","c":"Bakery & Pastry","reg":"Toscana","prov":"Grosseto, Massa-Carrara, Arezzo, Siena, Firenze, Pistoia, Pisa, Livorno, Lucca, Prato","lat":42.7603,"lon":11.1135},{"n":38,"name":"Capocollo di Calabria","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Calabria","prov":"Catanzaro, Cosenza, Crotone, Reggio Calabria, Vibo Valentia","lat":38.9097,"lon":16.5961},{"n":39,"name":"Cappellacci di zucca ferraresi","d":"IGP","c":"Pasta","reg":"Emilia-Romagna","prov":"Ferrara","lat":44.8381,"lon":11.6198},{"n":40,"name":"Cappero delle Isole Eolie","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Isole di Lipari, Vulcano, Filicudi, Alicudi, Panarea, Stromboli, Santa Marina Salina, Malfa e Leni nell'Isola di Salina","lat":38.4673,"lon":14.9533},{"n":41,"name":"Cappero di Pantelleria","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Trapani","lat":36.7917,"lon":11.9956},{"n":42,"name":"Carciofo Brindisino","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Brindisi","lat":40.6386,"lon":17.9461},{"n":43,"name":"Carciofo di Paestum","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":44,"name":"Carciofo romanesco del Lazio","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Viterbo, Roma, Latina","lat":42.4207,"lon":12.1063},{"n":45,"name":"Carciofo spinoso di Sardegna","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sardegna","prov":"tutte","lat":40.1209,"lon":9.0129},{"n":46,"name":"Carota dell'altopiano del Fucino","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Abruzzo","prov":"L'Aquila","lat":42.3498,"lon":13.3995},{"n":47,"name":"Carota novella di Ispica","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Ragusa, Siracusa, Catania, Caltanissetta","lat":36.9255,"lon":14.7305},{"n":48,"name":"Cartoceto","d":"DOP","c":"Oils & Fats","reg":"Marche","prov":"Pesaro e Urbino","lat":43.9102,"lon":12.9133},{"n":49,"name":"Casatella trevigiana","d":"DOP","c":"Cheese","reg":"Veneto","prov":"Treviso","lat":45.6669,"lon":12.2433},{"n":50,"name":"Casciotta d'Urbino","d":"DOP","c":"Cheese","reg":"Marche; Emilia-Romagna","prov":"Pesaro e Urbino, Rimini","lat":43.9102,"lon":12.9133},{"n":51,"name":"Castagna Cuneo","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Piemonte","prov":"Cuneo","lat":44.3841,"lon":7.5426},{"n":52,"name":"Castagna del Monte Amiata","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Toscana","prov":"Grosseto, Siena","lat":42.7603,"lon":11.1135},{"n":53,"name":"Castagna di Montella","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Avellino","lat":40.9143,"lon":14.7929},{"n":54,"name":"Castagna di Vallerano","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Viterbo","lat":42.4207,"lon":12.1063},{"n":55,"name":"Castelmagno","d":"DOP","c":"Cheese","reg":"Piemonte","prov":"Cuneo","lat":44.3841,"lon":7.5426},{"n":56,"name":"Chianti Classico","d":"DOP","c":"Oils & Fats","reg":"Toscana","prov":"Siena, Firenze","lat":43.3188,"lon":11.3308},{"n":57,"name":"Ciauscolo","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Marche","prov":"Ancona, Macerata, Ascoli Piceno","lat":43.6158,"lon":13.5189},{"n":58,"name":"Cilento","d":"DOP","c":"Oils & Fats","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":59,"name":"Ciliegia dell'Etna","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Catania","lat":37.5079,"lon":15.083},{"n":60,"name":"Ciliegia di Marostica","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Vicenza","lat":45.5455,"lon":11.5354},{"n":61,"name":"Ciliegia di Vignola","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Modena, Bologna","lat":44.6471,"lon":10.9252},{"n":62,"name":"Cinta senese","d":"DOP","c":"Meat (fresh)","reg":"Toscana","prov":"Arezzo, Firenze, Grosseto, Livorno, Lucca, Massa-Carrara, Pisa, Pistoia, Prato, Siena","lat":43.4633,"lon":11.8797},{"n":63,"name":"Cioccolato di Modica","d":"IGP","c":"Chocolate","reg":"Sicilia","prov":"Ragusa","lat":36.8631,"lon":14.77},{"n":64,"name":"Cipolla bianca di Margherita","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Barletta-Andra-Trani, Foggia","lat":41.3193,"lon":16.2811},{"n":65,"name":"Cipolla rossa di Tropea Calabria","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Calabria","prov":"Catanzaro, Cosenza, Vibo Valentia","lat":38.9097,"lon":16.5961},{"n":66,"name":"Cipollotto nocerino","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno, Napoli","lat":40.6824,"lon":14.7681},{"n":67,"name":"Clementine del golfo di Taranto","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Taranto","lat":40.4644,"lon":17.247},{"n":68,"name":"Clementine di Calabria","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Calabria","prov":"Reggio Calabria, Catanzaro, Cosenza, Vibo Valentia, Crotone","lat":38.1113,"lon":15.6619},{"n":69,"name":"Colatura di alici di Cetara","d":"DOP","c":"Fish & Seafood","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":70,"name":"Collina di Brindisi","d":"DOP","c":"Oils & Fats","reg":"Puglia","prov":"Brindisi","lat":40.6386,"lon":17.9461},{"n":71,"name":"Colline di Romagna","d":"DOP","c":"Oils & Fats","reg":"Emilia-Romagna","prov":"Forlì-Cesena, Rimini","lat":44.2226,"lon":12.0408},{"n":72,"name":"Colline Pontine","d":"DOP","c":"Oils & Fats","reg":"Lazio","prov":"Latina","lat":41.4677,"lon":12.9036},{"n":73,"name":"Colline Salernitane","d":"DOP","c":"Oils & Fats","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":74,"name":"Colline Teatine","d":"DOP","c":"Oils & Fats","reg":"Abruzzo","prov":"Chieti","lat":42.3512,"lon":14.1681},{"n":75,"name":"Coppa di Parma","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna; Lombardia","prov":"Parma, Modena, Reggio Emilia, Mantova, Pavia, Lodi, Milano, Cremona","lat":44.8015,"lon":10.3279},{"n":76,"name":"Coppa piacentina","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Piacenza","lat":45.0526,"lon":9.6929},{"n":77,"name":"Coppia ferrarese","d":"IGP","c":"Bakery & Pastry","reg":"Emilia-Romagna","prov":"Ferrara","lat":44.8381,"lon":11.6198},{"n":78,"name":"Cotechino Modena","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna; Lombardia; Veneto","prov":"Modena, Ferrara, Ravenna, Rimini, Forlì-Cesena, Bologna, Reggio Emilia, Parma, Piacenza, Cremona, Lodi, Pavia, Milano, Varese, Como, Lecco, Bergamo, Brescia, Mantova, Verona, Rovigo","lat":44.6471,"lon":10.9252},{"n":79,"name":"Cozza di Scardovari","d":"DOP","c":"Fish & Seafood","reg":"Veneto","prov":"Rovigo","lat":45.0707,"lon":11.7906},{"n":80,"name":"Crudo di Cuneo","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Piemonte","prov":"Cuneo, Asti, Torino","lat":44.3841,"lon":7.5426},{"n":81,"name":"Culatello di Zibello","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Parma","lat":44.9667,"lon":10.1},{"n":82,"name":"Culurgionis d'Ogliastra","d":"IGP","c":"Pasta","reg":"Sardegna","prov":"Ogliastra, Cagliari","lat":39.9167,"lon":9.6667},{"n":83,"name":"Dauno","d":"DOP","c":"Oils & Fats","reg":"Puglia","prov":"Foggia","lat":41.4621,"lon":15.5444},{"n":84,"name":"Fagioli bianchi di Rotonda","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Basilicata","prov":"Potenza","lat":40.642,"lon":15.8059},{"n":85,"name":"Fagiolo cannellino di Atina","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Frosinone","lat":41.6401,"lon":13.3506},{"n":86,"name":"Fagiolo Cuneo","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Piemonte","prov":"Cuneo","lat":44.3841,"lon":7.5426},{"n":87,"name":"Fagiolo di Lamon della Vallata Bellunese","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Belluno","lat":46.1404,"lon":12.2169},{"n":88,"name":"Fagiolo di Sarconi","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Basilicata","prov":"Potenza","lat":40.642,"lon":15.8059},{"n":89,"name":"Fagiolo di Sorana","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Toscana","prov":"Pescia (PT)","lat":43.9026,"lon":10.6883},{"n":90,"name":"Farina di castagne della Lunigiana","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Toscana","prov":"Massa Carrara","lat":44.0364,"lon":10.141},{"n":91,"name":"Farina di Neccio della Garfagnana","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Toscana","prov":"Lucca","lat":43.8429,"lon":10.5027},{"n":92,"name":"Farro della Garfagnana","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Toscana","prov":"Lucca","lat":43.8429,"lon":10.5027},{"n":93,"name":"Farro di Monteleone di Spoleto","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Umbria","prov":"Perugia","lat":43.1107,"lon":12.3908},{"n":94,"name":"Fichi di Cosenza","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Calabria","prov":"Cosenza","lat":39.3088,"lon":16.2535},{"n":95,"name":"Fico bianco del Cilento","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":96,"name":"Ficodindia dell'Etna","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Catania","lat":37.5079,"lon":15.083},{"n":97,"name":"Ficodindia di San Cono","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Catania, Enna, Caltanissetta","lat":37.5079,"lon":15.083},{"n":98,"name":"Finocchiona","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Toscana","prov":"Arezzo, Firenze, Grosseto, Livorno, Lucca, Massa-Carrara, Pisa, Pistoia, Prato e Siena","lat":43.4633,"lon":11.8797},{"n":99,"name":"Fiore sardo","d":"DOP","c":"Cheese","reg":"Sardegna","prov":"tutte","lat":40.1209,"lon":9.0129},{"n":100,"name":"Focaccia di Recco col formaggio","d":"IGP","c":"Bakery & Pastry","reg":"Liguria","prov":"Genova","lat":44.4056,"lon":8.9463},{"n":101,"name":"Fontina","d":"DOP","c":"Cheese","reg":"Valle d'Aosta","prov":"Aosta","lat":45.7372,"lon":7.3201},{"n":102,"name":"Formaggella del Luinese","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Varese","lat":45.8206,"lon":8.825},{"n":103,"name":"Formaggio di fossa di Sogliano","d":"DOP","c":"Cheese","reg":"Emilia-Romagna; Marche","prov":"Forlì-Cesena, Rimini, Ravenna, Bologna, Pesaro e Urbino, Ancona, Macerata, Ascoli Piceno","lat":44.2226,"lon":12.0408},{"n":104,"name":"Formai de Mut dell'Alta Valle Brembana","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Bergamo","lat":45.6983,"lon":9.6773},{"n":105,"name":"Fungo di Borgotaro","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna; Toscana","prov":"Parma, Massa Carrara","lat":44.8015,"lon":10.3279},{"n":106,"name":"Garda","d":"DOP","c":"Oils & Fats","reg":"Lombardia; Veneto; Trentino-Alto Adige","prov":"Brescia, Verona, Mantova, Trento","lat":45.5416,"lon":10.2118},{"n":107,"name":"Gorgonzola","d":"DOP","c":"Cheese","reg":"Piemonte; Lombardia","prov":"Alessandria, Bergamo, Brescia, Como, Cremona, Cuneo, Milano, Novara, Pavia, Vercelli","lat":44.9133,"lon":8.6149},{"n":108,"name":"Grana Padano","d":"DOP","c":"Cheese","reg":"Emilia-Romagna; Lombardia; Piemonte; Trentino-Alto Adige; Veneto","prov":"Alessandria, Asti, Cuneo, Novara, Torino, Vercelli, Bergamo, Brescia, Como, Cremona, Mantova, Milano, Lodi, Pavia, Sondrio, Varese, Padova, Trento, Rovigo, Treviso, Venezia, Verona, Vicenza, Bologna, Ferrara, Forlì, Piacenza, Ravenna","lat":44.9133,"lon":8.6149},{"n":109,"name":"Insalata di Lusia","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Rovigo e Padova","lat":45.2386,"lon":11.8337},{"n":110,"name":"Irpinia - Colline dell'Ufita","d":"DOP","c":"Oils & Fats","reg":"Campania","prov":"Avellino","lat":40.9143,"lon":14.7929},{"n":111,"name":"Kiwi Latina","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Latina, Roma","lat":41.4677,"lon":12.9036},{"n":112,"name":"La Bella della Daunia","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Foggia","lat":41.4621,"lon":15.5444},{"n":113,"name":"Laghi Lombardi","d":"DOP","c":"Oils & Fats","reg":"Lombardia","prov":"Brescia, Bergamo, Como, Lecco","lat":45.5416,"lon":10.2118},{"n":114,"name":"Lametia","d":"DOP","c":"Oils & Fats","reg":"Calabria","prov":"Catanzaro","lat":38.9097,"lon":16.5961},{"n":115,"name":"Lardo di Colonnata","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Toscana","prov":"Massa Carrara","lat":44.0364,"lon":10.141},{"n":116,"name":"Lenticchia di Altamura","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Puglia; Basilicata","prov":"Bari, Barletta-Andria-Trani, Matera, Potenza","lat":41.1171,"lon":16.8719},{"n":117,"name":"Lenticchia di Castelluccio di Norcia","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Umbria; Marche","prov":"Perugia, Macerata","lat":42.7944,"lon":13.0939},{"n":118,"name":"Limone Costa d'Amalfi","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":119,"name":"Limone dell'Etna","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Catania","lat":37.5079,"lon":15.083},{"n":120,"name":"Limone di Rocca Imperiale","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Calabria","prov":"Cosenza","lat":39.3088,"lon":16.2535},{"n":121,"name":"Limone di Siracusa","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Siracusa","lat":37.0755,"lon":15.2866},{"n":122,"name":"Limone di Sorrento","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Napoli","lat":40.8518,"lon":14.2681},{"n":123,"name":"Limone femminello del Gargano","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Foggia","lat":41.4621,"lon":15.5444},{"n":124,"name":"Limone interdonato di Messina","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Messina","lat":38.1938,"lon":15.554},{"n":125,"name":"Liquirizia di Calabria","d":"DOP","c":"Other (Annex I products)","reg":"Calabria","prov":"Catanzaro, Cosenza, Crotone, Reggio Calabria, Vibo Valentia","lat":38.9097,"lon":16.5961},{"n":126,"name":"Lucanica di Picerno","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Basilicata","prov":"Potenza","lat":40.642,"lon":15.8059},{"n":127,"name":"Lucca","d":"DOP","c":"Oils & Fats","reg":"Toscana","prov":"Lucca, Massa Carrara","lat":43.8429,"lon":10.5027},{"n":128,"name":"Maccheroncini di Campofilone","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Marche","prov":"Fermo","lat":43.1599,"lon":13.7187},{"n":129,"name":"Marche","d":"DOP","c":"Oils & Fats","reg":"Marche","prov":"Ancona, Ascoli Piceno, Fermo, Macerata, Pesaro e Urbino","lat":43.6158,"lon":13.5189},{"n":130,"name":"Marrone del Mugello","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Toscana","prov":"Firenze","lat":43.7696,"lon":11.2558},{"n":131,"name":"Marrone della Valle di Susa","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Piemonte","prov":"Torino","lat":45.0703,"lon":7.6869},{"n":132,"name":"Marrone di Caprese Michelangelo","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Toscana","prov":"Arezzo","lat":43.4633,"lon":11.8797},{"n":133,"name":"Marrone di Castel del Rio","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Bologna","lat":44.4949,"lon":11.3426},{"n":134,"name":"Marrone di Combai","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Treviso","lat":45.6669,"lon":12.2433},{"n":135,"name":"Marrone di Roccadaspide","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":136,"name":"Marrone di San Zeno","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Verona","lat":45.4384,"lon":10.9916},{"n":137,"name":"Marrone di Serino","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Avellino, Salerno","lat":40.9143,"lon":14.7929},{"n":138,"name":"Marroni del Monfenera","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Treviso","lat":45.6669,"lon":12.2433},{"n":139,"name":"Mela Alto Adige o Südtiroler Apfel","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Trentino-Alto Adige","prov":"Bolzano","lat":46.4983,"lon":11.3548},{"n":140,"name":"Mela di Valtellina","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lombardia","prov":"Sondrio","lat":46.1709,"lon":9.8716},{"n":141,"name":"Mela rossa Cuneo","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Piemonte","prov":"Cuneo, Torino","lat":44.3841,"lon":7.5426},{"n":142,"name":"Mela Val di Non","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Trentino-Alto Adige","prov":"Trento","lat":46.0679,"lon":11.1211},{"n":143,"name":"Melannurca Campana","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Avellino, Benevento, Caserta, Napoli e Salerno","lat":40.9143,"lon":14.7929},{"n":144,"name":"Melanzana rossa di Rotonda","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Basilicata","prov":"Potenza","lat":40.642,"lon":15.8059},{"n":145,"name":"Mele del Trentino","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Trentino-Alto Adige","prov":"Trento","lat":46.0679,"lon":11.1211},{"n":146,"name":"Melone mantovano","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lombardia; Emilia-Romagna","prov":"Mantova, Cremona, Modena, Bologna, Ferrara","lat":45.1564,"lon":10.7914},{"n":147,"name":"Miele della Lunigiana","d":"DOP","c":"Other Animal Products","reg":"Toscana","prov":"Massa Carrara","lat":44.0364,"lon":10.141},{"n":148,"name":"Miele delle Dolomiti Bellunesi","d":"DOP","c":"Other Animal Products","reg":"Veneto","prov":"Belluno","lat":46.1404,"lon":12.2169},{"n":149,"name":"Miele Varesino","d":"DOP","c":"Other Animal Products","reg":"Lombardia","prov":"Varese","lat":45.8206,"lon":8.825},{"n":150,"name":"Molise","d":"DOP","c":"Oils & Fats","reg":"Molise","prov":"Campobasso, Isernia","lat":41.5602,"lon":14.6627},{"n":151,"name":"Montasio","d":"DOP","c":"Cheese","reg":"Friuli Venezia Giulia; Veneto","prov":"Gorizia, Pordenone, Trieste, Udine, Belluno, Treviso, Padova, Venezia","lat":45.9416,"lon":13.6206},{"n":152,"name":"Monte Etna","d":"DOP","c":"Oils & Fats","reg":"Sicilia","prov":"Catania, Enna, Messina","lat":37.5079,"lon":15.083},{"n":153,"name":"Monte Veronese","d":"DOP","c":"Cheese","reg":"Veneto","prov":"Verona","lat":45.4384,"lon":10.9916},{"n":154,"name":"Monti Iblei","d":"DOP","c":"Oils & Fats","reg":"Sicilia","prov":"Siracusa, Ragusa, Catania","lat":37.0755,"lon":15.2866},{"n":155,"name":"Mortadella Bologna","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna; Piemonte; Lombardia; Veneto; Marche; Lazio; Trentino-Alto Adige; Toscana","prov":"Modena, Parma, Piacenza, Ravenna, Reggio Emilia, Alessandria, Asti, Cuneo, Novara, Torino, Vercelli, Bergamo, Brescia, Como, Cremona, Mantova, Milano, Pavia, Sondrio, Varese, Belluno, Padova, Rovigo, Treviso, Venezia, Verona, Vicenza, Ancona, Ascoli Piceno, Macerata, Pesaro e Urbino, Roma, Frosinone, Viterbo, Latina, Rieti, Trento, Arezzo, Firenze, Grosseto, Livorno, Lucca, Massa Carrara, Pisa, Pistoia, Siena, Ferrara, Forlì-Cesena","lat":44.6471,"lon":10.9252},{"n":156,"name":"Mortadella di Prato","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Toscana","prov":"Prato, Pistoia","lat":43.8777,"lon":11.0955},{"n":158,"name":"Mozzarella di bufala campana","d":"DOP","c":"Cheese","reg":"Campania; Lazio; Molise; Puglia","prov":"Benevento, Caserta, Napoli, Salerno, Frosinone, Latina, Roma, Foggia, Isernia","lat":41.1297,"lon":14.7826},{"n":159,"name":"Mozzarella di Gioia del Colle","d":"DOP","c":"Cheese","reg":"Puglia; Basilicata","prov":"Bari, Taranto, Matera","lat":41.1171,"lon":16.8719},{"n":160,"name":"Murazzano","d":"DOP","c":"Cheese","reg":"Piemonte","prov":"Cuneo","lat":44.3841,"lon":7.5426},{"n":161,"name":"Nocciola del Piemonte o Nocciola Piemonte","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Piemonte","prov":"Alessandria, Asti, Cuneo, Novara, Torino, Vercelli","lat":44.9133,"lon":8.6149},{"n":162,"name":"Nocciola di Giffoni","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":163,"name":"Nocciola romana","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Viterbo, Roma","lat":42.4207,"lon":12.1063},{"n":164,"name":"Nocellara del Belice","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Trapani","lat":38.0176,"lon":12.5365},{"n":165,"name":"Nostrano Valtrompia","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Brescia","lat":45.5416,"lon":10.2118},{"n":166,"name":"Olio di Calabria","d":"IGP","c":"Oils & Fats","reg":"Calabria","prov":"Catanzaro, Cosenza, Crotone, Vibo Valentia, Reggio Calabria","lat":38.9097,"lon":16.5961},{"n":167,"name":"Olio di Puglia","d":"IGP","c":"Oils & Fats","reg":"Puglia","prov":"Bari, Barletta-Andria-Trani, Brindisi, Foggia, Lecce, Taranto","lat":41.1171,"lon":16.8719},{"n":168,"name":"Olio di Roma","d":"IGP","c":"Oils & Fats","reg":"Lazio","prov":"Roma","lat":41.9028,"lon":12.4964},{"n":169,"name":"Oliva Ascolana del Piceno","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Marche; Abruzzo","prov":"Ascoli, Teramo","lat":42.8536,"lon":13.5757},{"n":170,"name":"Olio Lucano","d":"IGP","c":"Oils & Fats","reg":"Basilicata","prov":"Potenza, Matera","lat":40.642,"lon":15.8059},{"n":171,"name":"Oliva di Gaeta","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Lazio; Campania","prov":"Latina, Frosinone, Roma, Caserta","lat":41.4677,"lon":12.9036},{"n":172,"name":"Ossolano","d":"DOP","c":"Cheese","reg":"Piemonte","prov":"Verbania Cusio Ossola","lat":45.9219,"lon":8.5511},{"n":173,"name":"Pagnotta del Dittaino","d":"DOP","c":"Bakery & Pastry","reg":"Sicilia","prov":"Enna, Catania","lat":37.5664,"lon":14.2814},{"n":174,"name":"Pampapato di Ferrara o Pampepato di Ferrara","d":"IGP","c":"Bakery & Pastry","reg":"Emilia-Romagna","prov":"Ferrara","lat":44.8381,"lon":11.6198},{"n":175,"name":"Pampapato di Terni o Pampepato di Terni","d":"IGP","c":"Bakery & Pastry","reg":"Umbria","prov":"Terni","lat":42.5636,"lon":12.6433},{"n":176,"name":"Pancetta di Calabria","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Calabria","prov":"Catanzaro, Cosenza, Crotone, Reggio Calabria, Vibo Valentia","lat":38.9097,"lon":16.5961},{"n":177,"name":"Pancetta piacentina","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Piacenza","lat":45.0526,"lon":9.6929},{"n":178,"name":"Pane casareccio di Genzano","d":"IGP","c":"Bakery & Pastry","reg":"Lazio","prov":"Roma","lat":41.9028,"lon":12.4964},{"n":179,"name":"Pane di Altamura","d":"DOP","c":"Bakery & Pastry","reg":"Puglia","prov":"Bari","lat":41.1171,"lon":16.8719},{"n":180,"name":"Pane di Matera","d":"IGP","c":"Bakery & Pastry","reg":"Basilicata","prov":"Matera","lat":40.6664,"lon":16.6043},{"n":181,"name":"Pane toscano","d":"DOP","c":"Bakery & Pastry","reg":"Toscana","prov":"Grosseto, Massa-Carrara, Arezzo, Siena, Firenze, Pistoia, Pisa, Livorno, Lucca, Prato","lat":42.7603,"lon":11.1135},{"n":182,"name":"Panforte di Siena","d":"IGP","c":"Bakery & Pastry","reg":"Toscana","prov":"Siena","lat":43.3188,"lon":11.3308},{"n":183,"name":"Parmigiano Reggiano","d":"DOP","c":"Cheese","reg":"Emilia-Romagna; Lombardia","prov":"Parma, Reggio Emilia, Modena, Bologna, Mantova","lat":44.8015,"lon":10.3279},{"n":184,"name":"Pasta di Gragnano","d":"IGP","c":"Pasta","reg":"Campania","prov":"Napoli","lat":40.8518,"lon":14.2681},{"n":185,"name":"Patata dell'Alto Viterbese","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Viterbo","lat":42.4207,"lon":12.1063},{"n":186,"name":"Patata della Sila","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Calabria","prov":"Cosenza, Catanzaro","lat":39.3088,"lon":16.2535},{"n":187,"name":"Patata del Fucino","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Abruzzo","prov":"L'Aquila","lat":42.3498,"lon":13.3995},{"n":188,"name":"Patata di Bologna","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Bologna","lat":44.4949,"lon":11.3426},{"n":189,"name":"Patata novella di Galatina","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Lecce","lat":40.3515,"lon":18.175},{"n":190,"name":"Patata rossa di Colfiorito","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Umbria; Marche","prov":"Perugia, Macerata","lat":43.1107,"lon":12.3908},{"n":191,"name":"Pecorino Crotonese","d":"DOP","c":"Cheese","reg":"Calabria","prov":"Crotone","lat":39.0808,"lon":17.1269},{"n":192,"name":"Pecorino delle Balze Volterrane","d":"DOP","c":"Cheese","reg":"Toscana","prov":"Pisa","lat":43.7228,"lon":10.4017},{"n":193,"name":"Pecorino del Monte Poro","d":"DOP","c":"Cheese","reg":"Calabria","prov":"Vibo Valentia","lat":38.6757,"lon":16.1004},{"n":194,"name":"Pecorino di Filiano","d":"DOP","c":"Cheese","reg":"Basilicata","prov":"Potenza","lat":40.642,"lon":15.8059},{"n":195,"name":"Pecorino di Picinisco","d":"DOP","c":"Cheese","reg":"Lazio","prov":"Frosinone","lat":41.6401,"lon":13.3506},{"n":196,"name":"Pecorino romano","d":"DOP","c":"Cheese","reg":"Toscana; Lazio; Sardegna","prov":"Frosinone, Grosseto, Latina, Roma, Viterbo, Cagliari, Nuoro, Sassari","lat":41.6401,"lon":13.3506},{"n":197,"name":"Pecorino sardo","d":"DOP","c":"Cheese","reg":"Sardegna","prov":"tutte","lat":40.1209,"lon":9.0129},{"n":198,"name":"Pecorino siciliano","d":"DOP","c":"Cheese","reg":"Sicilia","prov":"Agrigento, Caltanissetta, Catania, Enna, Messina, Palermo, Ragusa, Siracusa, Trapani","lat":37.3111,"lon":13.5765},{"n":199,"name":"Pecorino toscano","d":"DOP","c":"Cheese","reg":"Toscana; Umbria; Lazio","prov":"Arezzo, Firenze, Grosseto, Siena, Livorno, Lucca, Massa Carrara, Pistoia, Pisa, Viterbo, Terni","lat":43.4633,"lon":11.8797},{"n":200,"name":"Penisola sorrentina","d":"DOP","c":"Oils & Fats","reg":"Campania","prov":"Napoli","lat":40.8518,"lon":14.2681},{"n":201,"name":"Peperone di Pontecorvo","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Frosinone","lat":41.6401,"lon":13.3506},{"n":202,"name":"Peperone di Senise","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Basilicata","prov":"Potenza, Matera","lat":40.642,"lon":15.8059},{"n":203,"name":"Pera dell'Emilia Romagna","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Reggio Emilia, Modena, Ferrara, Bologna, Ravenna","lat":44.6989,"lon":10.6307},{"n":204,"name":"Pera mantovana","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lombardia","prov":"Mantova","lat":45.1564,"lon":10.7914},{"n":205,"name":"Pescabivona","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Agrigento, Palermo","lat":37.3111,"lon":13.5765},{"n":206,"name":"Pesca di Leonforte","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Enna","lat":37.5664,"lon":14.2814},{"n":207,"name":"Pesca di Verona","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Verona","lat":45.4384,"lon":10.9916},{"n":208,"name":"Pesca di Delia","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Caltanissetta, Agrigento","lat":37.4904,"lon":14.0623},{"n":209,"name":"Pesca e Nettarina di Romagna","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Ferrara, Bologna, Forlì-Cesena, Ravenna","lat":44.8381,"lon":11.6198},{"n":210,"name":"Piacentinu Ennese","d":"DOP","c":"Cheese","reg":"Sicilia","prov":"Enna","lat":37.5664,"lon":14.2814},{"n":211,"name":"Piadina romagnola o Piada romagnola","d":"IGP","c":"Bakery & Pastry","reg":"Emilia-Romagna","prov":"Rimini, Forlì, Cesena, Ravenna e Bologna","lat":44.0594,"lon":12.5683},{"n":212,"name":"Piave","d":"DOP","c":"Cheese","reg":"Veneto","prov":"Belluno","lat":46.1404,"lon":12.2169},{"n":213,"name":"Pistacchio verde di Bronte","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Catania","lat":37.7833,"lon":14.8333},{"n":214,"name":"Pistacchio di Raffadali","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Agrigento, Caltanissetta","lat":37.3111,"lon":13.5765},{"n":215,"name":"Pitina","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Friuli Venezia Giulia","prov":"Pordenone","lat":45.9564,"lon":12.6571},{"n":217,"name":"Pizzoccheri della Valtellina","d":"IGP","c":"Pasta","reg":"Lombardia","prov":"Sondrio","lat":46.1709,"lon":9.8716},{"n":218,"name":"Pomodorino del piennolo del Vesuvio","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Napoli","lat":40.8518,"lon":14.2681},{"n":219,"name":"Pomodoro di Pachino","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Ragusa, Siracusa","lat":36.7167,"lon":15.1},{"n":220,"name":"Pomodoro di San Marzano dell'agro sarnese-nocerino","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno, Avellino, Napoli","lat":40.6824,"lon":14.7681},{"n":221,"name":"Porchetta di Ariccia","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Lazio","prov":"Roma","lat":41.9028,"lon":12.4964},{"n":222,"name":"Pretuziano delle Colline Teramane","d":"DOP","c":"Oils & Fats","reg":"Abruzzo","prov":"Teramo","lat":42.6589,"lon":13.7037},{"n":223,"name":"Prosciutto Amatriciano","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Lazio","prov":"Rieti","lat":42.403,"lon":12.8617},{"n":224,"name":"Prosciutto di Carpegna","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Marche","prov":"Pesaro e Urbino","lat":43.9102,"lon":12.9133},{"n":225,"name":"Prosciutto di Modena","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Modena, Bologna, Reggio Emilia","lat":44.6471,"lon":10.9252},{"n":226,"name":"Prosciutto di Norcia","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Umbria","prov":"Perugia","lat":42.7944,"lon":13.0939},{"n":227,"name":"Prosciutto di Parma","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Parma","lat":44.8015,"lon":10.3279},{"n":228,"name":"Prosciutto di San Daniele","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Friuli Venezia Giulia","prov":"Udine","lat":46.0711,"lon":13.2346},{"n":229,"name":"Prosciutto di Sauris","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Friuli Venezia Giulia","prov":"Udine","lat":46.0711,"lon":13.2346},{"n":230,"name":"Prosciutto toscano","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Toscana","prov":"Arezzo, Firenze, Grosseto, Siena, Livorno, Lucca, Massa Carrara, Pistoia, Pisa","lat":43.4633,"lon":11.8797},{"n":231,"name":"Prosciutto Veneto Berico-Euganeo","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Veneto","prov":"Vicenza, Verona, Padova","lat":45.5455,"lon":11.5354},{"n":232,"name":"Provola dei Nebrodi","d":"DOP","c":"Cheese","reg":"Sicilia","prov":"Catania, Enna, Messina","lat":37.5079,"lon":15.083},{"n":233,"name":"Provolone del Monaco","d":"DOP","c":"Cheese","reg":"Campania","prov":"Napoli","lat":40.8518,"lon":14.2681},{"n":234,"name":"Provolone Valpadana","d":"DOP","c":"Cheese","reg":"Trentino-Alto Adige; Lombardia; Veneto; Emilia-Romagna","prov":"Cremona, Brescia, Verona, Vicenza, Rovigo, Padova, Piacenza, Bergamo, Mantova, Milano, Trento","lat":45.1335,"lon":10.0422},{"n":235,"name":"Puzzone di Moena/Spretz Tzaorì","d":"DOP","c":"Cheese","reg":"Trentino-Alto Adige","prov":"Trento, Bolzano","lat":46.0679,"lon":11.1211},{"n":236,"name":"Quartirolo Lombardo","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Brescia, Bergamo, Como, Cremona, Milano, Pavia, Varese","lat":45.5416,"lon":10.2118},{"n":237,"name":"Radicchio di Chioggia","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Venezia, Padova, Rovigo","lat":45.4408,"lon":12.3155},{"n":238,"name":"Radicchio di Verona","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Verona, Vicenza, Padova","lat":45.4384,"lon":10.9916},{"n":239,"name":"Radicchio rosso di Treviso","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Treviso, Padova, Venezia","lat":45.6669,"lon":12.2433},{"n":240,"name":"Radicchio Variegato di Castelfranco","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Treviso, Padova, Venezia","lat":45.6669,"lon":12.2433},{"n":241,"name":"Ragusano","d":"DOP","c":"Cheese","reg":"Sicilia","prov":"Ragusa, Siracusa","lat":36.9255,"lon":14.7305},{"n":242,"name":"Raschera","d":"DOP","c":"Cheese","reg":"Piemonte","prov":"Cuneo","lat":44.3841,"lon":7.5426},{"n":243,"name":"Ricciarelli di Siena","d":"IGP","c":"Bakery & Pastry","reg":"Toscana","prov":"Siena","lat":43.3188,"lon":11.3308},{"n":244,"name":"Ricotta di bufala campana","d":"DOP","c":"Other Animal Products","reg":"Campania; Lazio; Molise; Puglia","prov":"Benevento, Caserta, Napoli, Salerno, Frosinone, Latina, Roma, Foggia, Isernia","lat":41.1297,"lon":14.7826},{"n":245,"name":"Ricotta romana","d":"DOP","c":"Other Animal Products","reg":"Lazio","prov":"Roma, Frosinone, Viterbo, Latina, Rieti","lat":41.9028,"lon":12.4964},{"n":246,"name":"Riso del Delta del Po","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto; Emilia-Romagna","prov":"Rovigo, Ferrara","lat":45.0707,"lon":11.7906},{"n":247,"name":"Riso di Baraggia Biellese e Vercellese","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Piemonte","prov":"Biella, Vercelli","lat":45.5667,"lon":8.0533},{"n":248,"name":"Riso Vialone Nano Veronese","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Veneto","prov":"Verona","lat":45.4384,"lon":10.9916},{"n":249,"name":"Riviera Ligure","d":"DOP","c":"Oils & Fats","reg":"Liguria","prov":"Imperia, Savona, Genova, La Spezia","lat":43.8896,"lon":8.0277},{"n":250,"name":"Robiola di Roccaverano","d":"DOP","c":"Cheese","reg":"Piemonte","prov":"Asti, Alessandria","lat":44.9008,"lon":8.2065},{"n":251,"name":"Rucola della Piana del Sele","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Campania","prov":"Salerno","lat":40.6824,"lon":14.7681},{"n":252,"name":"Sabina","d":"DOP","c":"Oils & Fats","reg":"Lazio","prov":"Rieti, Roma","lat":42.403,"lon":12.8617},{"n":253,"name":"Salama da sugo","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Ferrara","lat":44.8381,"lon":11.6198},{"n":254,"name":"Salame Brianza","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Lombardia","prov":"Brescia, Bergamo, Como, Cremona, Milano, Pavia, Varese","lat":45.5416,"lon":10.2118},{"n":255,"name":"Salame Cremona","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Lombardia; Emilia-Romagna; Piemonte; Veneto","prov":"Bergamo, Brescia, Como, Cremona, Lecco, Lodi, Mantova, Milano, Monza e della Brianza, Pavia, Sondrio, Varese, Bologna, Ferrara, Forlì-Cesena, Modena, Parma, Piacenza, Ravenna, Reggio Emilia, Rimini, Alessandria, Asti, Biella, Cuneo, Novara, Torino, Verbano Cusio e Ossola, Vercelli, Belluno, Padova, Rovigo, Treviso, Venezia, Verona, Vicenza","lat":45.6983,"lon":9.6773},{"n":256,"name":"Salame di Varzi","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Lombardia","prov":"Pavia","lat":45.1847,"lon":9.1582},{"n":257,"name":"Salame d'oca di Mortara","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Lombardia","prov":"Pavia","lat":45.1847,"lon":9.1582},{"n":258,"name":"Salame Felino","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Parma","lat":44.8015,"lon":10.3279},{"n":259,"name":"Salame Piacentino","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna","prov":"Piacenza","lat":45.0526,"lon":9.6929},{"n":260,"name":"Salame Piemonte","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Piemonte","prov":"Alessandria, Asti, Biella, Cuneo, Novara, Torino, Verbano-Cusio-Ossola, Vercelli","lat":44.9133,"lon":8.6149},{"n":261,"name":"Salame Sant'Angelo di Brolo","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Sicilia","prov":"Messina","lat":38.1938,"lon":15.554},{"n":262,"name":"Salamini italiani alla cacciatora","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Abruzzo; Emilia-Romagna; Friuli Venezia Giulia; Lazio; Lombardia; Marche; Piemonte; Toscana; Umbria; Molise; Veneto","prov":"L'Aquila, Chieti, Pescara, Teramo, Bologna, Ferrara, Forlì, Modena, Parma, Piacenza, Ravenna, Reggio Emilia, Gorizia, Pordenone, Trieste, Udine, Roma, Frosinone, Rieti, Latina, Viterbo, Bergamo, Brescia, Como, Cremona, Mantova, Milano, Pavia, Sondrio, Varese, Ancona, Ascoli Piceno, Macerata, Pesaro e Urbino, Alessandria, Asti, Cuneo, Novara, Torino, Vercelli, Arezzo, Siena, Firenze, Pisa, Pistoia, Grosseto, Livorno, Lucca, Massa Carrara, Perugia, Terni, Campobasso, Isernia, Belluno, Padova, Rovigo, Treviso, Venezia, Verona, Vicenza","lat":42.3498,"lon":13.3995},{"n":263,"name":"Sale marino di Trapani","d":"IGP","c":"Other (Annex I products)","reg":"Sicilia","prov":"Trapani","lat":38.0176,"lon":12.5365},{"n":264,"name":"Salmerino del Trentino","d":"IGP","c":"Fish & Seafood","reg":"Trentino-Alto Adige; Lombardia","prov":"Trento, Brescia","lat":46.0679,"lon":11.1211},{"n":265,"name":"Salsiccia di Calabria","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Calabria","prov":"Catanzaro, Cosenza, Crotone, Reggio Calabria, Vibo Valentia","lat":38.9097,"lon":16.5961},{"n":266,"name":"Salva Cremasco","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Bergamo, Brescia, Cremona, Lecco, Lodi, Milano","lat":45.6983,"lon":9.6773},{"n":267,"name":"Sardegna","d":"DOP","c":"Oils & Fats","reg":"Sardegna","prov":"tutte","lat":40.1209,"lon":9.0129},{"n":268,"name":"Scalogno di Romagna","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Emilia-Romagna","prov":"Ravenna, Forlì-Cesena, Bologna","lat":44.4173,"lon":12.201},{"n":269,"name":"Sedano bianco di Sperlonga","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Lazio","prov":"Latina","lat":41.4677,"lon":12.9036},{"n":270,"name":"Seggiano","d":"DOP","c":"Oils & Fats","reg":"Toscana","prov":"Grosseto","lat":42.7603,"lon":11.1135},{"n":271,"name":"Sicilia","d":"DOP","c":"Oils & Fats","reg":"Sicilia","prov":"Agrigento, Caltanissetta, Catania, Enna, Messina, Palermo, Ragusa, Siracusa, Trapani","lat":37.3111,"lon":13.5765},{"n":272,"name":"Silter","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Brescia","lat":45.5416,"lon":10.2118},{"n":273,"name":"Soppressata di Calabria","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Calabria","prov":"Catanzaro, Cosenza, Crotone, Reggio Calabria, Vibo Valentia","lat":38.9097,"lon":16.5961},{"n":274,"name":"Sopressa Vicentina","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Veneto","prov":"Vicenza","lat":45.5455,"lon":11.5354},{"n":275,"name":"Speck Alto Adige o Südtiroler Markenspeck o Südtiroler Speck","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Trentino-Alto Adige","prov":"Bolzano","lat":46.4983,"lon":11.3548},{"n":276,"name":"Spressa delle Giudicarie","d":"DOP","c":"Cheese","reg":"Trentino-Alto Adige","prov":"Trento","lat":46.0679,"lon":11.1211},{"n":277,"name":"Squacquerone di Romagna","d":"DOP","c":"Cheese","reg":"Emilia-Romagna","prov":"Ravenna, Forlì-Cesena, Rimini, Bologna, Ferrara","lat":44.4173,"lon":12.201},{"n":278,"name":"Stelvio","d":"DOP","c":"Cheese","reg":"Trentino-Alto Adige","prov":"Bolzano","lat":46.4983,"lon":11.3548},{"n":279,"name":"Strachitunt","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Bergamo","lat":45.6983,"lon":9.6773},{"n":280,"name":"Südtiroler Schüttelbrot o Schüttelbrot Alto Adige","d":"IGP","c":"Bakery & Pastry","reg":"Trentino-Alto Adige","prov":"Bolzano","lat":46.4983,"lon":11.3548},{"n":281,"name":"Susina di Dro","d":"DOP","c":"Fruit, Vegetables & Cereals","reg":"Trentino-Alto Adige","prov":"Trento","lat":46.0679,"lon":11.1211},{"n":282,"name":"Taleggio","d":"DOP","c":"Cheese","reg":"Lombardia; Veneto; Piemonte","prov":"Bergamo, Brescia, Como, Cremona, Milano, Pavia, Treviso, Novara","lat":45.6983,"lon":9.6773},{"n":283,"name":"Tergeste","d":"DOP","c":"Oils & Fats","reg":"Friuli Venezia Giulia","prov":"Trieste","lat":45.6495,"lon":13.7768},{"n":284,"name":"Terra d'Otranto","d":"DOP","c":"Oils & Fats","reg":"Puglia","prov":"Taranto, Brindisi, Lecce","lat":40.4644,"lon":17.247},{"n":285,"name":"Terra di Bari","d":"DOP","c":"Oils & Fats","reg":"Puglia","prov":"Bari","lat":41.1171,"lon":16.8719},{"n":286,"name":"Terre Aurunche","d":"DOP","c":"Oils & Fats","reg":"Campania","prov":"Caserta","lat":41.0721,"lon":14.3326},{"n":287,"name":"Terre di Siena","d":"DOP","c":"Oils & Fats","reg":"Toscana","prov":"Siena","lat":43.3188,"lon":11.3308},{"n":288,"name":"Terre Tarentine","d":"DOP","c":"Oils & Fats","reg":"Puglia","prov":"Taranto","lat":40.4644,"lon":17.247},{"n":289,"name":"Tinca Gobba Dorata del Pianalto di Poirino","d":"DOP","c":"Fish & Seafood","reg":"Piemonte","prov":"Torino, Asti, Cuneo","lat":45.0703,"lon":7.6869},{"n":290,"name":"Toma Piemontese","d":"DOP","c":"Cheese","reg":"Piemonte","prov":"Novara, Vercelli, Biella, Torino, Cuneo, Alessandria, Asti","lat":45.4469,"lon":8.6217},{"n":291,"name":"Torrone di Bagnara","d":"IGP","c":"Bakery & Pastry","reg":"Calabria","prov":"Reggio Calabria","lat":38.1113,"lon":15.6619},{"n":292,"name":"Toscano","d":"IGP","c":"Oils & Fats","reg":"Toscana","prov":"Grosseto, Massa Carrara, Arezzo, Siena, Firenze, Pistoia, Pisa, Livorno, Prato, Lucca","lat":42.7603,"lon":11.1135},{"n":293,"name":"Trota del Trentino","d":"IGP","c":"Fish & Seafood","reg":"Trentino-Alto Adige; Lombardia","prov":"Trento, Brescia","lat":46.0679,"lon":11.1211},{"n":294,"name":"Tuscia","d":"DOP","c":"Oils & Fats","reg":"Lazio","prov":"Viterbo","lat":42.4207,"lon":12.1063},{"n":295,"name":"Umbria","d":"DOP","c":"Oils & Fats","reg":"Umbria","prov":"Perugia, Terni","lat":43.1107,"lon":12.3908},{"n":296,"name":"Uva da tavola di Canicattì","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Agrigento, Caltanissetta","lat":37.3111,"lon":13.5765},{"n":297,"name":"Uva da tavola di Mazzarrone","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Sicilia","prov":"Catania, Ragusa","lat":37.5079,"lon":15.083},{"n":298,"name":"Uva di Puglia","d":"IGP","c":"Fruit, Vegetables & Cereals","reg":"Puglia","prov":"Bari, Barletta-Andria-Trani, Brindisi, Foggia, Taranto, Lecce","lat":41.1171,"lon":16.8719},{"n":299,"name":"Val di Mazara","d":"DOP","c":"Oils & Fats","reg":"Sicilia","prov":"Palermo, Agrigento","lat":38.1157,"lon":13.3615},{"n":300,"name":"Valdemone","d":"DOP","c":"Oils & Fats","reg":"Sicilia","prov":"Messina","lat":38.1938,"lon":15.554},{"n":301,"name":"Valle d'Aosta Fromadzo","d":"DOP","c":"Cheese","reg":"Valle d'Aosta","prov":"Aosta","lat":45.7372,"lon":7.3201},{"n":302,"name":"Valle d'Aosta Jambon de Bosses","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Valle d'Aosta","prov":"Aosta","lat":45.7372,"lon":7.3201},{"n":303,"name":"Valle d'Aosta Lard d'Arnad/Vallée d'Aoste Lard d'Arnad","d":"DOP","c":"Meat Products (Cured/Processed)","reg":"Valle d'Aosta","prov":"Aosta","lat":45.7372,"lon":7.3201},{"n":304,"name":"Valle del Belice","d":"DOP","c":"Oils & Fats","reg":"Sicilia","prov":"Trapani","lat":38.0176,"lon":12.5365},{"n":305,"name":"Valli Trapanesi","d":"DOP","c":"Oils & Fats","reg":"Sicilia","prov":"Trapani","lat":38.0176,"lon":12.5365},{"n":306,"name":"Valtellina Casera","d":"DOP","c":"Cheese","reg":"Lombardia","prov":"Sondrio","lat":46.1709,"lon":9.8716},{"n":307,"name":"Vastedda della Valle del Belice","d":"DOP","c":"Cheese","reg":"Sicilia","prov":"Agrigento, Trapani, Palermo","lat":37.3111,"lon":13.5765},{"n":308,"name":"Veneto Valpolicella, Veneto Euganei e Berici, Veneto del Grappa","d":"DOP","c":"Oils & Fats","reg":"Veneto","prov":"Verona, Padova, Vicenza, Treviso","lat":45.4384,"lon":10.9916},{"n":310,"name":"Vitellone bianco dell'Appennino Centrale","d":"IGP","c":"Meat (fresh)","reg":"Emilia-Romagna; Toscana; Marche; Abruzzo; Molise; Campania; Lazio; Umbria","prov":"Bologna, Ravenna, Forlì-Cesena, Rimini, Pesaro e Urbino, Ancona, Macerata, Ascoli Piceno, Teramo, Pescara, Chieti, L'Aquila, Campobasso, Isernia, Benevento, Avellino, Frosinone, Rieti, Viterbo, Terni, Perugia, Grosseto, Siena, Arezzo, Firenze, Livorno, Pisa","lat":44.4949,"lon":11.3426},{"n":311,"name":"Vitelloni piemontesi della coscia","d":"IGP","c":"Meat (fresh)","reg":"Piemonte; Liguria","prov":"Alessandria, Asti, Biella, Cuneo, Torino, Novara, Vercelli, Savona, Imperia","lat":44.9133,"lon":8.6149},{"n":312,"name":"Vulture","d":"DOP","c":"Oils & Fats","reg":"Basilicata","prov":"Potenza","lat":40.642,"lon":15.8059},{"n":313,"name":"Zafferano dell'Aquila","d":"DOP","c":"Other (Annex I products)","reg":"Abruzzo","prov":"L'Aquila","lat":42.3498,"lon":13.3995},{"n":314,"name":"Zafferano di San Gimignano","d":"DOP","c":"Other (Annex I products)","reg":"Toscana","prov":"Siena","lat":43.3188,"lon":11.3308},{"n":315,"name":"Zafferano di Sardegna","d":"DOP","c":"Other (Annex I products)","reg":"Sardegna","prov":"Sud Sardegna","lat":39.1667,"lon":8.5333},{"n":316,"name":"Zampone Modena","d":"IGP","c":"Meat Products (Cured/Processed)","reg":"Emilia-Romagna; Lombardia; Veneto","prov":"Modena, Ferrara, Ravenna, Rimini, Forlì, Bologna, Reggio Emilia, Parma, Piacenza, Cremona, Lodi, Pavia, Milano, Varese, Como, Lecco, Bergamo, Brescia, Mantova, Verona, Rovigo","lat":44.6471,"lon":10.9252},{"n":11,"name":"Amatriciana Tradizionale","d":"STG","c":"Prepared Dishes","reg":"tutta Italia","prov":"tutte","lat":42.6333,"lon":13.2833},{"n":157,"name":"Mozzarella","d":"STG","c":"Cheese","reg":"tutta Italia","prov":"tutte","lat":40.8518,"lon":14.2681},{"n":216,"name":"Pizza napoletana","d":"STG","c":"Prepared Dishes","reg":"tutta Italia","prov":"tutte","lat":40.8518,"lon":14.2681},{"n":309,"name":"Vincisgrassi alla maceratese","d":"STG","c":"Prepared Dishes","reg":"tutta Italia","prov":"tutte","lat":43.3006,"lon":13.4533}];
+
+const DESIG_COLORS = { DOP: '#4a7c4e', IGP: '#c9a24b', STG: '#5b7fa6' };
+
+// Shared tasting data lives in Lauren's Google Sheet, served via this Apps Script Web App.
+// Everyone who loads the map reads the same data; only Lauren (with the passcode) can write to it.
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPIvpBiazUGWTHC4YWRDDX-BZjB1dceKgCgt0aqibWNoaeZsc3p0FpUYKiXH06U45N/exec';
+const ADMIN_PASSCODE_KEY = 'mappaSaporiAdminPasscode';
+
+let tastingState = {};
+
+async function loadTastingState() {
+  const statusEl = document.getElementById('sync-status');
+  try {
+    const res = await fetch(APPS_SCRIPT_URL);
+    const data = await res.json();
+    tastingState = data || {};
+    if (statusEl) statusEl.textContent = 'Synced with shared tasting log';
+  } catch (e) {
+    tastingState = {};
+    if (statusEl) statusEl.textContent = 'Could not load shared tasting data — showing empty view';
+  }
+}
+
+function getEntry(num) {
+  return tastingState[num] || { tasted: false, date: '', rating: '', notes: '' };
+}
+function setEntry(num, entry) {
+  tastingState[num] = entry;
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function isAdminMode() {
+  return !!sessionStorage.getItem(ADMIN_PASSCODE_KEY);
+}
+function getPasscode() {
+  return sessionStorage.getItem(ADMIN_PASSCODE_KEY) || '';
+}
+function enterAdminMode() {
+  const code = prompt('Enter the admin passcode to edit tasting entries:');
+  if (!code) return;
+  sessionStorage.setItem(ADMIN_PASSCODE_KEY, code);
+  updateAdminButton();
+}
+function exitAdminMode() {
+  sessionStorage.removeItem(ADMIN_PASSCODE_KEY);
+  updateAdminButton();
+}
+function updateAdminButton() {
+  const btn = document.getElementById('admin-toggle-btn');
+  if (!btn) return;
+  if (isAdminMode()) {
+    btn.textContent = 'Exit admin mode';
+    btn.onclick = exitAdminMode;
+  } else {
+    btn.textContent = 'Admin login';
+    btn.onclick = enterAdminMode;
+  }
+}
+
+async function saveEntryRemote(p, entry) {
+  const statusEl = document.getElementById(`save-status-${p.n}`);
+  if (statusEl) statusEl.textContent = 'Saving...';
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ num: p.n, passcode: getPasscode(), ...entry })
+    });
+    const result = await res.json();
+    if (result && result.error) {
+      if (statusEl) statusEl.textContent = 'Passcode incorrect — not saved.';
+      if (result.error === 'Unauthorized') exitAdminMode();
+      return;
+    }
+    setEntry(p.n, entry);
+    if (statusEl) statusEl.textContent = 'Saved!';
+    refreshStats();
+    refreshList();
+    updateMarkerStyle(p.n);
+  } catch (e) {
+    if (statusEl) statusEl.textContent = 'Network error — try again.';
+  }
+}
+
+const map = L.map('map', { minZoom: 5, maxZoom: 12 }).setView([42.5, 12.5], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 18
+}).addTo(map);
+
+const markers = {};
+const markerGroup = L.layerGroup().addTo(map);
+
+function popupHtml(p) {
+  const e = getEntry(p.n);
+  const dClass = p.d.toLowerCase();
+  const meta = `
+    <div class="popup-title">${p.name}</div>
+    <div class="popup-meta">
+      <span class="popup-badge ${dClass}">${p.d}</span>
+      ${p.c} &middot; ${p.reg}
+      ${p.prov && p.prov !== 'tutte' ? '<br>Provinces: ' + p.prov : ''}
+    </div>
+  `;
+
+  if (!isAdminMode()) {
+    // Public, read-only view of Lauren's tasting progress.
+    if (!e.tasted) {
+      return meta + `<div class="tasted-status no">Not tasted yet</div>`;
+    }
+    const stars = e.rating ? `<div class="popup-field"><label>Rating</label><span class="popup-stars">${'★'.repeat(Number(e.rating))}${'☆'.repeat(5 - Number(e.rating))}</span></div>` : '';
+    const notes = e.notes ? `<div class="popup-field"><label>Notes</label><div class="popup-notes-readonly">${escapeHtml(e.notes)}</div></div>` : '';
+    return meta + `
+      <div class="tasted-status yes">&#10003; Tasted${e.date ? ' on ' + escapeHtml(e.date) : ''}</div>
+      ${stars}
+      ${notes}
+    `;
+  }
+
+  // Admin edit view.
+  return meta + `
+    <div class="tasted-toggle">
+      <input type="checkbox" id="tasted-${p.n}" ${e.tasted ? 'checked' : ''}>
+      <label for="tasted-${p.n}">Tasted it!</label>
+    </div>
+    <div class="popup-field">
+      <label>Date tasted</label>
+      <input type="text" id="date-${p.n}" placeholder="e.g. 2026-09-12" value="${e.date || ''}">
+    </div>
+    <div class="popup-field">
+      <label>Rating</label>
+      <select id="rating-${p.n}">
+        <option value="">-</option>
+        ${[1,2,3,4,5].map(n => `<option value="${n}" ${String(e.rating)===String(n)?'selected':''}>${n}</option>`).join('')}
+      </select>
+    </div>
+    <div class="popup-field">
+      <label>Notes</label>
+      <textarea id="notes-${p.n}" placeholder="Where, with whom, what it tasted like...">${e.notes || ''}</textarea>
+    </div>
+    <button class="popup-save-btn" id="save-${p.n}">Save</button>
+    <div class="popup-save-status" id="save-status-${p.n}"></div>
+  `;
+}
+
+function wirePopup(p) {
+  if (!isAdminMode()) return;
+  const saveBtn = document.getElementById(`save-${p.n}`);
+  if (!saveBtn) return;
+  saveBtn.addEventListener('click', () => {
+    const tastedEl = document.getElementById(`tasted-${p.n}`);
+    const dateEl = document.getElementById(`date-${p.n}`);
+    const ratingEl = document.getElementById(`rating-${p.n}`);
+    const notesEl = document.getElementById(`notes-${p.n}`);
+    saveEntryRemote(p, {
+      tasted: tastedEl.checked,
+      date: dateEl.value,
+      rating: ratingEl.value,
+      notes: notesEl.value
+    });
+  });
+}
+
+function markerStyleFor(p) {
+  const e = getEntry(p.n);
+  const color = DESIG_COLORS[p.d] || '#999';
+  return {
+    radius: 6,
+    fillColor: color,
+    color: e.tasted ? '#2e2620' : 'white',
+    weight: e.tasted ? 2.5 : 1.5,
+    fillOpacity: e.tasted ? 0.45 : 0.9
+  };
+}
+
+function updateMarkerStyle(num) {
+  const m = markers[num];
+  if (!m) return;
+  const p = PRODUCTS.find(x => x.n === num);
+  m.setStyle(markerStyleFor(p));
+}
+
+PRODUCTS.forEach(p => {
+  const marker = L.circleMarker([p.lat, p.lon], markerStyleFor(p));
+  marker.bindPopup(() => popupHtml(p), { maxWidth: 280 });
+  marker.on('popupopen', () => wirePopup(p));
+  markers[p.n] = marker;
+});
+
+function uniqueSorted(arr) {
+  return Array.from(new Set(arr)).sort((a,b) => a.localeCompare(b));
+}
+const allRegions = uniqueSorted(PRODUCTS.flatMap(p => p.reg.split('; ')));
+const allCategories = uniqueSorted(PRODUCTS.map(p => p.c));
+
+const regionSel = document.getElementById('filter-region');
+allRegions.forEach(r => {
+  const opt = document.createElement('option');
+  opt.value = r; opt.textContent = r;
+  regionSel.appendChild(opt);
+});
+const catSel = document.getElementById('filter-category');
+allCategories.forEach(c => {
+  const opt = document.createElement('option');
+  opt.value = c; opt.textContent = c;
+  catSel.appendChild(opt);
+});
+
+function currentFilters() {
+  const region = regionSel.value;
+  const category = catSel.value;
+  const tastedFilter = document.getElementById('filter-tasted').value;
+  const search = document.getElementById('filter-search').value.trim().toLowerCase();
+  const desigs = Array.from(document.querySelectorAll('.desig-check'))
+    .filter(c => c.checked).map(c => c.value);
+  return { region, category, tastedFilter, search, desigs };
+}
+
+function matchesFilters(p, f) {
+  if (f.region && !p.reg.split('; ').includes(f.region)) return false;
+  if (f.category && p.c !== f.category) return false;
+  if (!f.desigs.includes(p.d)) return false;
+  if (f.search && !p.name.toLowerCase().includes(f.search)) return false;
+  const tasted = getEntry(p.n).tasted;
+  if (f.tastedFilter === 'yes' && !tasted) return false;
+  if (f.tastedFilter === 'no' && tasted) return false;
+  return true;
+}
+
+function applyFilters() {
+  const f = currentFilters();
+  markerGroup.clearLayers();
+  const visible = [];
+  PRODUCTS.forEach(p => {
+    if (matchesFilters(p, f)) {
+      markers[p.n].addTo(markerGroup);
+      visible.push(p);
+    }
+  });
+  refreshList(visible);
+}
+
+function refreshList(visibleOverride) {
+  const f = currentFilters();
+  const visible = visibleOverride || PRODUCTS.filter(p => matchesFilters(p, f));
+  const listEl = document.getElementById('product-list');
+  document.getElementById('result-count').textContent = `${visible.length} of 316 products`;
+  listEl.innerHTML = '';
+  visible
+    .slice()
+    .sort((a,b) => a.name.localeCompare(b.name))
+    .forEach(p => {
+      const e = getEntry(p.n);
+      const li = document.createElement('li');
+      li.className = 'list-item' + (e.tasted ? ' tasted' : '');
+      li.innerHTML = `<span>${p.name}</span><span class="tag ${p.d.toLowerCase()}">${p.d}</span>`;
+      li.addEventListener('click', () => {
+        map.setView([p.lat, p.lon], 9);
+        markers[p.n].openPopup();
+      });
+      listEl.appendChild(li);
+    });
+}
+
+function refreshStats() {
+  const tastedCount = PRODUCTS.filter(p => getEntry(p.n).tasted).length;
+  document.getElementById('stat-tasted').textContent = tastedCount;
+  document.getElementById('stat-remaining').textContent = 316 - tastedCount;
+}
+
+[regionSel, catSel, document.getElementById('filter-tasted')].forEach(el =>
+  el.addEventListener('change', applyFilters)
+);
+document.getElementById('filter-search').addEventListener('input', applyFilters);
+document.querySelectorAll('.desig-check').forEach(c => c.addEventListener('change', applyFilters));
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  regionSel.value = '';
+  catSel.value = '';
+  document.getElementById('filter-tasted').value = '';
+  document.getElementById('filter-search').value = '';
+  document.querySelectorAll('.desig-check').forEach(c => c.checked = true);
+  applyFilters();
+});
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  const data = PRODUCTS.map(p => ({ name: p.name, designation: p.d, ...getEntry(p.n) }))
+    .filter(p => p.tasted || p.notes || p.rating);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'my_dop_igp_tasting_notes.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+async function init() {
+  updateAdminButton();
+  await loadTastingState();
+  PRODUCTS.forEach(p => updateMarkerStyle(p.n));
+  applyFilters();
+  refreshStats();
+}
+init();
+</script>
+</body>
+</html>
