@@ -291,6 +291,13 @@ function setVisitorEntry(num, entry) {
   saveVisitorState(visitorState);
 }
 
+function displayName(p) {
+  // Several Oils & Fats designations share their name with a region or wine zone
+  // (Chianti Classico, Garda, Sardegna...) — clarify these are olive oils on screen
+  // without altering the underlying official designation name used for search/sort.
+  return p.c === 'Oils & Fats' ? `${p.name} (Olive Oil)` : p.name;
+}
+
 function escapeHtml(str) {
   return String(str || '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -362,7 +369,7 @@ function popupHtml(p) {
   const e = getEntry(p.n);
   const dClass = p.d.toLowerCase();
   const meta = `
-    <div class="popup-title">${p.name}</div>
+    <div class="popup-title">${displayName(p)}</div>
     <div class="popup-meta">
       <span class="popup-badge ${dClass}">${p.d}</span>
       ${p.c} &middot; ${p.reg}
@@ -564,7 +571,7 @@ function refreshList(visibleOverride) {
       const e = getEntry(p.n);
       const li = document.createElement('li');
       li.className = 'list-item' + (e.tasted ? ' tasted' : '');
-      li.innerHTML = `<span>${p.name}</span><span class="tag ${p.d.toLowerCase()}">${p.d}</span>`;
+      li.innerHTML = `<span>${displayName(p)}</span><span class="tag ${p.d.toLowerCase()}">${p.d}</span>`;
       li.addEventListener('click', () => {
         map.setView([p.lat, p.lon], 9);
         markers[p.n].openPopup();
