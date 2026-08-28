@@ -582,8 +582,9 @@ function refreshList(visibleOverride) {
 
 function refreshStats() {
   const tastedCount = PRODUCTS.filter(p => getEntry(p.n).tasted).length;
+  document.getElementById('stat-total').textContent = PRODUCTS.length;
   document.getElementById('stat-tasted').textContent = tastedCount;
-  document.getElementById('stat-remaining').textContent = 316 - tastedCount;
+  document.getElementById('stat-remaining').textContent = PRODUCTS.length - tastedCount;
 }
 
 [regionSel, catSel, document.getElementById('filter-tasted')].forEach(el =>
