@@ -562,7 +562,7 @@ function refreshList(visibleOverride) {
   const f = currentFilters();
   const visible = visibleOverride || PRODUCTS.filter(p => matchesFilters(p, f));
   const listEl = document.getElementById('product-list');
-  document.getElementById('result-count').textContent = `${visible.length} of 316 products`;
+  document.getElementById('result-count').textContent = `${visible.length} of ${PRODUCTS.length} products`;
   listEl.innerHTML = '';
   visible
     .slice()
